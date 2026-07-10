@@ -1,0 +1,91 @@
+---
+title: "Quickstart"
+description: "Publish a sample app through Meradomo and reach it remotely — in about 10 minutes."
+---
+
+This guide runs [`fridge-notes`](/examples/fridge-notes) through Meradomo, then connects to it from a
+separate client with [`remote-notes-client`](/examples/remote-notes-client).
+
+## Prerequisites
+
+- **Meradomo installed and connected** — the menu-bar app shows a green dot. ([Get Meradomo](https://meradomo.com).)
+- **Node.js ≥ 20** on your Mac.
+- The two sample apps from this repo (`examples/fridge-notes`, `examples/remote-notes-client`).
+
+<Steps>
+  <Step title="Publish Fridge Notes (~3 min)">
+    Start the sample app:
+
+    ```sh
+    cd examples/fridge-notes
+    node server.js
+    ```
+
+    It starts on a random local port and immediately requests publication:
+
+    ```
+    [fridge-notes] listening on 127.0.0.1:51234
+    [fridge-notes] requesting publish as "notes" on port 51234 …
+    [fridge-notes] waiting for approval in the menu-bar app…
+    ```
+  </Step>
+
+  <Step title="Approve in the menu-bar app">
+    A prompt appears in the Meradomo menu-bar app:
+
+    > **Fridge Notes** wants to be available through your Meradomo.
+
+    Click **Allow**.
+  </Step>
+
+  <Step title="Open your live address">
+    The terminal prints something like:
+
+    ```
+      Fridge Notes is live at: https://notes.your-name.meradomo.com
+    ```
+
+    Open it in a browser. Sign in with your Meradomo account if prompted (once). You'll see the notes
+    page greeting you: "Hello, you@email.com" — the app never handled sign-in; it just read the
+    `X-Meradomo-Email` header Meradomo injected.
+  </Step>
+
+  <Step title="Connect a remote client (~5 min)">
+    To use the **Connect** path you need an OAuth client for your app.
+
+    <Note>
+      Self-serve client registration is coming to the developer portal. For now,
+      [request an OAuth client](https://meradomo.com) and you'll receive a `clientId` and, for
+      confidential clients, a `clientSecret`.
+    </Note>
+
+    Run the sample client with your credentials:
+
+    ```sh
+    cd examples/remote-notes-client
+    CLIENT_ID=<clientId> CLIENT_SECRET=<clientSecret> node client.js
+    ```
+  </Step>
+
+  <Step title="Approve in the browser">
+    The script prints an authorization URL. Open it, sign in, and click **Allow** on the consent page
+    ("Remote Notes wants to connect to your Meradomo"). The browser redirects back to the client's
+    local callback, and the script prints the notes list it fetched with the access token.
+  </Step>
+</Steps>
+
+## What just happened
+
+- **fridge-notes** used the local management API to register itself — no SDK or library.
+- **remote-notes-client** ran the full OAuth 2.0 + PKCE flow to obtain an access token the Meradomo
+  agent validates on every request.
+- The agent injected the verified `X-Meradomo-Email` header so the app could greet you **without ever
+  handling sign-in**.
+
+## Next steps
+
+<CardGroup cols={3}>
+  <Card title="Agent API" icon="rss" href="/guides/agent-api">Publish lifecycle + identity headers.</Card>
+  <Card title="Connect (OAuth)" icon="key" href="/guides/oauth">Endpoints, token claims, revocation.</Card>
+  <Card title="Security model" icon="shield" href="/guides/security-model">What your app can trust.</Card>
+</CardGroup>

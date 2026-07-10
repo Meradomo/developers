@@ -1,0 +1,28 @@
+---
+title: "API reference"
+description: "The two HTTP surfaces that make up the Meradomo integration API."
+---
+
+Meradomo has no SDK — these HTTP endpoints **are** the API. There are two surfaces:
+
+<CardGroup cols={2}>
+  <Card title="Publish API" icon="rss">
+    On `http://127.0.0.1:8765` — the local management API your on-device app calls to publish itself
+    and read status. Localhost-only; any local process may call the open tier. See
+    [Agent API](/guides/agent-api).
+  </Card>
+  <Card title="Connect API (OAuth)" icon="key">
+    On `https://account.meradomo.com` — the OAuth 2.0 + PKCE endpoints your remote client uses to
+    obtain an access token. See [Connect with Meradomo](/guides/oauth).
+  </Card>
+</CardGroup>
+
+## Authentication
+
+- **Publish API:** none — it binds loopback only, so being a local process is the boundary. Never
+  expose port 8765 to the network.
+- **Connect API:** OAuth 2.0 authorization-code + PKCE (S256). Confidential clients also send a
+  `client_secret`. Access tokens are Ed25519 JWS, verified by the agent on every request.
+
+The endpoints on the left are generated from the [OpenAPI description](https://developers.meradomo.com)
+in this repo (`api-reference/openapi.json`).

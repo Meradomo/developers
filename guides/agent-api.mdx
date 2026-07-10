@@ -1,0 +1,108 @@
+---
+title: "Agent API"
+description: "The local management API your app uses to publish itself and read visitor identity."
+---
+
+The Meradomo agent exposes a **localhost-only** HTTP management API on `127.0.0.1:8765`. Any process
+on the same machine can call the **open tier** (publish). The **owner tier** (approve / revoke) is
+handled by the menu-bar app, not by your app.
+
+## Publish lifecycle
+
+```
+POST /publish   →  pending   (owner has not yet approved)
+                   ↓
+owner approves  →  live      (reachable at https://<name>.<host>)
+                   ↓
+DELETE /publish →  revoked   (route removed, approval retained)
+re-POST /publish → live      (immediately — approval was kept)
+                   ↓
+owner revokes   →  removed   (approval forgotten; next POST is pending again)
+```
+
+App names must match `^[a-z0-9-]{1,63}$` and must not be reserved (`www`, `portal`, or the customer's
+own name).
+
+## Open tier — any local process
+
+### POST /publish
+
+Request a publication.
+
+```json
+{ "name": "notes", "label": "Fridge Notes", "localPort": 3456 }
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `name` | string | The label used as the subdomain (`notes` → `notes.you.meradomo.com`) |
+| `label` | string | Human-readable name shown in the menu-bar app |
+| `localPort` | number | The local port your app is listening on |
+
+| Status | Body | Meaning |
+| --- | --- | --- |
+| `202` | `{"status":"pending"}` | First time — waiting for owner approval |
+| `200` | `{"status":"live","host":"notes.you.meradomo.com","url":"https://…"}` | Previously approved — immediately live |
+
+Then poll `GET /publish/:name` until `status === "live"`.
+
+### GET /publish/:name
+
+```json
+{ "status": "pending" }
+{ "status": "live", "host": "notes.you.meradomo.com", "url": "https://notes.you.meradomo.com" }
+```
+
+Returns `404` if the name was never published or was fully revoked.
+
+### DELETE /publish/:name
+
+App-initiated stop. Removes the live route but **keeps the approval**, so a later `POST /publish` is
+immediately live without another prompt.
+
+### GET /status
+
+The agent's connection state and a summary of published apps.
+
+```json
+{
+  "connected": true,
+  "host": "you.meradomo.com",
+  "name": "you",
+  "url": "https://you.meradomo.com",
+  "pendingApps": 1,
+  "apps": []
+}
+```
+
+Use this on startup to detect whether Meradomo is installed — if the call fails, run standalone and
+hide any "available through Meradomo" UI.
+
+## Identity headers — the `X-Meradomo-*` contract
+
+On every proxied request to your app, the agent:
+
+1. **Strips** all inbound `X-Meradomo-*` and `X-Forwarded-*` headers.
+2. **Injects** verified, non-spoofable values:
+
+| Header | Value |
+| --- | --- |
+| `X-Meradomo-User` | Account sub (stable unique id for the visitor) |
+| `X-Meradomo-Email` | Verified email address |
+| `X-Meradomo-Name` | The customer's short name (e.g. `you`) |
+| `X-Meradomo-App` | Your published app's label |
+
+Treat these as the **sole** source of identity — no sign-in logic needed. See
+[Security model](/guides/security-model) for the unspoofability guarantee.
+
+## Owner tier (informational — the menu-bar app)
+
+Approving, denying, and revoking apps is the menu-bar app's job (guarded by a secret only it knows).
+Your app never calls these routes; it just handles the `pending` → `live` transition by polling
+`GET /publish/:name`.
+
+## Local development notes
+
+- The management API binds `127.0.0.1` on a real Mac. **Never expose port 8765 to the network.**
+- No authentication is required for open-tier calls — any local process can publish.
+- Bind your own server to `127.0.0.1` too, so nothing on the network reaches it un-fronted by Meradomo.

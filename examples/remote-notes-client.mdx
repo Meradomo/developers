@@ -1,0 +1,52 @@
+---
+title: "Remote Notes Client (Connect)"
+description: "A runnable OAuth 2.0 + PKCE reference client for the Connect with Meradomo flow."
+---
+
+**Remote Notes Client** is the reference **Connect** integration: it runs the full OAuth 2.0 + PKCE
+flow, gets an access token, and fetches notes from a published [Fridge Notes](/examples/fridge-notes)
+app from another device.
+
+<Card title="Source" icon="github" href="https://github.com/Meradomo/developers/tree/main/examples/remote-notes-client">
+  `examples/remote-notes-client/` — MIT-licensed. Two files: `client.js` and `README.md`.
+</Card>
+
+## Prerequisites
+
+- An OAuth client (`CLIENT_ID`, and `CLIENT_SECRET` for confidential clients) with
+  `http://localhost:9998/callback` as a registered redirect URI. (Self-serve registration is coming;
+  request one for now.)
+- Fridge Notes published, so there's an app to fetch from.
+
+## Run it
+
+```sh
+cd examples/remote-notes-client
+CLIENT_ID=<id> CLIENT_SECRET=<secret> node client.js
+```
+
+Open the printed authorization URL, sign in, approve. The script exchanges the code for a token and
+prints the fetched notes.
+
+## The flow, in code
+
+```js
+// 1. PKCE
+const verifier  = crypto.randomBytes(32).toString('base64url');
+const challenge = crypto.createHash('sha256').update(verifier, 'ascii').digest('base64url');
+
+// 2. Send the user to /oauth/authorize (client_id, redirect_uri, code_challenge, scope=connect) …
+// 3. Receive ?code=… on your local callback, then exchange it:
+const res = await fetch('https://account.meradomo.com/oauth/token', {
+  method: 'POST',
+  headers: { 'content-type': 'application/x-www-form-urlencoded' },
+  body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri,
+                              client_id, code_verifier: verifier }).toString(),
+});
+const { access_token, host } = await res.json();
+
+// 4. Call the live app with the Bearer token
+await fetch(`https://notes.${host}/api/notes`, { headers: { authorization: `Bearer ${access_token}` } });
+```
+
+Full details in [Connect with Meradomo](/guides/oauth).

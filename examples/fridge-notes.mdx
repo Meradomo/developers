@@ -1,0 +1,43 @@
+---
+title: "Fridge Notes (Publish)"
+description: "A runnable sample app that publishes itself through Meradomo and reads visitor identity — no sign-in code."
+---
+
+**Fridge Notes** is the smallest useful **Publish** integration: a local notes server that makes
+itself reachable through Meradomo and greets each visitor by their verified email.
+
+<Card title="Source" icon="github" href="https://github.com/Meradomo/developers/tree/main/examples/fridge-notes">
+  `examples/fridge-notes/` — MIT-licensed. Two files: `server.js` and `README.md`.
+</Card>
+
+## Run it
+
+```sh
+cd examples/fridge-notes
+node server.js
+```
+
+Approve **Fridge Notes** in the menu-bar app, then open the printed
+`https://notes.<your-name>.meradomo.com`.
+
+## The two integration points
+
+**1. Self-publish** on launch — one HTTP call, then poll until live:
+
+```js
+const res = await fetch('http://127.0.0.1:8765/publish', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ name: 'notes', label: 'Fridge Notes', localPort: port }),
+});
+// 202 pending → poll GET /publish/notes until { status: 'live', url }
+```
+
+**2. Read identity** from the header the agent injects — no sign-in code:
+
+```js
+const email = req.headers['x-meradomo-email'] || null;   // verified, non-forgeable
+```
+
+That's the whole integration. See [Agent API](/guides/agent-api) for the full publish lifecycle and
+[Security model](/guides/security-model) for why the header can be trusted.

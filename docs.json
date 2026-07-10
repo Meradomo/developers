@@ -1,0 +1,72 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Meradomo",
+  "description": "Build apps that run on a user's own computer and reach them from anywhere — through Meradomo.",
+  "colors": {
+    "primary": "#2199B5",
+    "light": "#46b3ca",
+    "dark": "#14829c"
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "favicon": "/logo/light.svg",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": ["introduction", "quickstart"]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/agent-api",
+              "guides/oauth",
+              "guides/security-model"
+            ]
+          },
+          {
+            "group": "Examples",
+            "pages": [
+              "examples/fridge-notes",
+              "examples/remote-notes-client"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API reference",
+        "groups": [
+          {
+            "group": "API reference",
+            "pages": ["api-reference/introduction"]
+          },
+          {
+            "group": "Endpoints",
+            "openapi": "/api-reference/openapi.json"
+          }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      { "label": "Apps", "href": "https://meradomo.com/apps" }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get Meradomo",
+      "href": "https://meradomo.com"
+    }
+  },
+  "footer": {
+    "socials": {
+      "website": "https://meradomo.com"
+    }
+  }
+}

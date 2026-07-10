@@ -1,0 +1,54 @@
+---
+title: "Security model"
+description: "What your app can trust when it runs behind Meradomo."
+---
+
+## Requests carry a verified identity
+
+When a visitor reaches your published app through Meradomo, they have already signed in. The agent
+checks every request before it reaches your app — **no sign-in or password handling is needed inside
+your app.** The agent places the visitor's verified identity into request headers:
+
+- `X-Meradomo-User` — a stable, unique identifier for this person's account.
+- `X-Meradomo-Email` — their verified email address.
+- `X-Meradomo-Name` — the owner's short name.
+- `X-Meradomo-App` — the name of your published app.
+
+These arrive over the local loopback connection from the agent. Treat them as authoritative.
+
+## Visitors cannot forge these headers
+
+A visitor's browser connects to the shared relay, which forwards the encrypted connection to the
+user's Mac **without reading it**. The agent decrypts it locally, strips any `X-Meradomo-*` headers
+the visitor supplied, verifies the identity, and only then sets the headers itself before passing the
+request to your app.
+
+The local loopback hop — between the agent and your app — is not reachable from the network, so there
+is no path for a visitor to inject a forged header.
+
+## The shared infrastructure cannot read the traffic
+
+The relay forwards sealed bytes. The user's private key lives only on their Mac. While the Mac is
+online the relay has no key for that address, so it **physically cannot decrypt** the traffic.
+
+The only exception: when the Mac is offline, the relay briefly shows visitors a short "this computer
+is asleep" page using a short-lived key held in memory only during that period. As soon as the Mac is
+back online, the relay returns to forwarding sealed bytes.
+
+## Revocation takes effect within seconds
+
+If the user disconnects an app (from the menu-bar app or their account dashboard), its access stops
+within a few seconds. The agent keeps a current list of authorized apps and refuses requests from any
+that have been removed.
+
+## What Meradomo does not do
+
+- It does not log, inspect, or store the content of requests or responses.
+- It does not share the user's data with third parties.
+- It does not retain copies of the private key.
+
+## Summary for app developers
+
+Your app receives a verified `X-Meradomo-Email` on every request. You do not need to implement
+sign-in, and you do not need to verify signatures or tokens — the agent has already done that. Trust
+the `X-Meradomo-*` headers and build on top of them.

@@ -1,0 +1,71 @@
+---
+title: "Build for Meradomo"
+description: "Make an app that runs on a user's own computer, and let them reach it from anywhere — with verified identity, no sign-in code, and no servers to run."
+---
+
+Meradomo makes a user's locally-running app reachable from all their devices, and hands your app a
+**verified identity** for every visitor. Your app stays on the user's machine; Meradomo does the
+networking and the sign-in.
+
+You never run a server, register a callback for auth, or handle passwords. Your app is a plain local
+HTTP server; Meradomo does the rest.
+
+## Two ways to integrate
+
+<CardGroup cols={2}>
+  <Card title="Publish — for on-device apps" icon="rss" href="/guides/agent-api">
+    Your app runs on the same Mac as Meradomo. On launch it calls the local management API
+    (`POST 127.0.0.1:8765/publish`) and — once the owner approves — becomes reachable at its own
+    address. Every request arrives with verified `X-Meradomo-*` identity headers. **No sign-in code.**
+  </Card>
+  <Card title="Connect — for remote clients" icon="key" href="/guides/oauth">
+    Your app has its own mobile app, CLI, or web client that talks to the user's Meradomo from
+    elsewhere. Use **"Connect with Meradomo"** (OAuth 2.0 + PKCE) to obtain an access token the agent
+    validates on every request — with refresh-token rotation and one-tap revocation.
+  </Card>
+</CardGroup>
+
+<Note>
+Most apps only need **Publish**. Reach for **Connect** when you also ship a separate client (native
+app or CLI) that connects into the user's Meradomo from another device.
+</Note>
+
+## The addressing model
+
+- The user has a root address, `you.meradomo.com` (their chosen short name).
+- **Each app you publish gets its own address** — a full host, not a path:
+  `app.you.meradomo.com` (e.g. `notes.you.meradomo.com`). Your app lives at the **root** of that
+  host, so all your root-relative asset and API paths just work unmodified.
+- Publishing a new app provisions **no new certificate** — one wildcard covers every app under the
+  user's namespace (`*.you.meradomo.com`). Adding apps is instant.
+
+## What your app can trust
+
+On every request that reaches your published app, Meradomo injects verified, non-forgeable headers:
+
+| Header | Value |
+| --- | --- |
+| `X-Meradomo-User` | Stable, unique id for the signed-in person |
+| `X-Meradomo-Email` | Their verified email address |
+| `X-Meradomo-Name` | The owner's short name |
+| `X-Meradomo-App` | Your published app's label |
+
+Treat these as the **sole** source of identity — no sign-in logic needed. See
+[Security model](/guides/security-model) for why they can't be forged.
+
+## Start here
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="bolt" href="/quickstart">
+    Publish a sample app and reach it remotely in ~10 minutes.
+  </Card>
+  <Card title="Sample apps" icon="code" href="/examples/fridge-notes">
+    Two runnable, MIT-licensed examples — one Publish, one Connect.
+  </Card>
+</CardGroup>
+
+<Info>
+There is intentionally **no SDK** in v1 — the local management API and the OAuth endpoints *are* the
+integration surface, and the two samples are the reference implementations. Everything you need is a
+plain HTTP call.
+</Info>

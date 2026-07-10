@@ -1,0 +1,144 @@
+---
+title: "Connect with Meradomo (OAuth)"
+description: "The OAuth 2.0 + PKCE flow that lets your remote client obtain an access token for a Meradomo user."
+---
+
+Use **Connect with Meradomo** when your app ships a separate client — a mobile app, a CLI, or a web
+client — that connects into the user's Meradomo from another device. It's the OAuth 2.0
+authorization-code flow with PKCE (S256).
+
+<Info>
+There is intentionally **no SDK** in v1. The OAuth endpoints below and the local management API *are*
+the integration surface; [`remote-notes-client`](/examples/remote-notes-client) is a full reference
+implementation.
+</Info>
+
+## Registering a client
+
+<Note>
+**Self-serve client registration is coming to the developer portal.** Until then,
+[request an OAuth client](https://meradomo.com) for your app. You'll receive a `clientId` and — for
+confidential clients (ones that can keep a secret) — a `clientSecret` shown **once**. Public clients
+(no secret) are on the roadmap; confidential clients must send the secret on every token request.
+You register one or more exact `redirectUris`.
+</Note>
+
+## Authorization flow
+
+<Steps>
+  <Step title="Generate PKCE">
+    ```js
+    const verifier  = crypto.randomBytes(32).toString('base64url');
+    const challenge = crypto.createHash('sha256').update(verifier, 'ascii').digest('base64url');
+    ```
+  </Step>
+
+  <Step title="Send the user to /oauth/authorize">
+    ```
+    GET https://account.meradomo.com/oauth/authorize
+      ?client_id=<clientId>
+      &redirect_uri=<exact registered URI>
+      &response_type=code
+      &state=<random>
+      &code_challenge=<challenge>
+      &code_challenge_method=S256
+      &scope=connect
+    ```
+
+    If the user isn't signed in, they're bounced to sign-in and returned here afterward. They see a
+    consent page — "**\<App name\>** wants to connect to your Meradomo." On approval the browser
+    redirects to `redirect_uri?code=…&state=…`; on denial, `?error=access_denied`.
+  </Step>
+
+  <Step title="Exchange the code for tokens">
+    ```
+    POST https://account.meradomo.com/oauth/token
+    Content-Type: application/x-www-form-urlencoded
+
+    grant_type=authorization_code
+    &code=<code>
+    &redirect_uri=<same as step 2>
+    &client_id=<clientId>
+    &client_secret=<clientSecret>   (confidential clients only)
+    &code_verifier=<verifier>
+    ```
+
+    **Response `200`:**
+
+    ```json
+    {
+      "access_token":  "eyJ…",
+      "token_type":    "Bearer",
+      "expires_in":    600,
+      "refresh_token": "…",
+      "scope":         "connect",
+      "address":       "https://you.meradomo.com",
+      "host":          "you.meradomo.com"
+    }
+    ```
+
+    `host` is the user's root address; a published app lives at `<app-name>.<host>`.
+  </Step>
+</Steps>
+
+## Access token claims
+
+Access tokens are EdDSA (Ed25519) compact JWS. Payload:
+
+| Claim | Value |
+| --- | --- |
+| `iss` | `meradomo-control` |
+| `sub` | Account id (stable, opaque) |
+| `email` | Verified email address |
+| `aud` | Root host (e.g. `you.meradomo.com`) |
+| `client_id` | Your OAuth client id |
+| `grant` | Grant id (used for revocation) |
+| `scope` | `connect` |
+| `iat` | Issued-at (unix seconds) |
+| `exp` | Expiry: `iat + 600` (10 minutes) |
+| `jti` | Unique token identifier |
+
+The signing public key is at `GET https://account.meradomo.com/auth/pubkey` (JSON with a `publicKey`
+PEM field). The agent fetches and caches this key.
+
+## Refresh tokens
+
+Refresh tokens are opaque, single-use, and stored hashed.
+
+```
+POST https://account.meradomo.com/oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=refresh_token
+&refresh_token=<token>
+```
+
+Same response shape as the code exchange. The old refresh token is invalidated immediately — replaying
+it returns `400 invalid_grant`. Refreshing after the grant was revoked returns `400 access_denied`.
+
+## Revocation
+
+The user can revoke your app from the menu-bar app or their account dashboard. Revocation is
+asynchronous within a short poll window:
+
+- New refresh-token requests fail immediately.
+- Existing access tokens stop working within the next agent poll cycle (a few seconds in production).
+
+The agent does not make a per-request call to validate tokens — revocation lands within the poll
+window.
+
+## CORS
+
+`POST /oauth/token` and `GET /auth/pubkey` include permissive CORS headers so browser-based clients
+can call them directly.
+
+## Error codes
+
+| Code | Meaning |
+| --- | --- |
+| `invalid_client` | Unknown or incorrect client |
+| `invalid_grant` | Code invalid, expired, already used, or PKCE mismatch |
+| `access_denied` | Grant revoked, or user denied consent |
+| `unsupported_grant_type` | Grant type not supported |
+| `invalid_redirect_uri` | Redirect URI not registered |
+| `unsupported_response_type` | Only `code` is supported |

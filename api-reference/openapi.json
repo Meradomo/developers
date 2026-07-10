@@ -1,0 +1,210 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Meradomo Public API",
+    "version": "1.0.0",
+    "description": "Two surfaces: the local management API on 127.0.0.1:8765 (Publish) and the OAuth endpoints on account.meradomo.com (Connect). No SDK — these HTTP endpoints are the integration surface.",
+    "license": { "name": "MIT" }
+  },
+  "servers": [
+    { "url": "http://127.0.0.1:8765", "description": "Local management API (Publish)" },
+    { "url": "https://account.meradomo.com", "description": "Control plane (Connect / OAuth)" }
+  ],
+  "paths": {
+    "/publish": {
+      "post": {
+        "operationId": "publish",
+        "summary": "Publish a local app",
+        "description": "Request that a locally-running app be made reachable. First call returns 202 pending (awaiting owner approval); once approved, returns 200 live.",
+        "servers": [{ "url": "http://127.0.0.1:8765" }],
+        "tags": ["Publish"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PublishRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Already approved — immediately live",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PublishLive" } } }
+          },
+          "202": {
+            "description": "First time — waiting for owner approval",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PublishPending" } } }
+          }
+        }
+      }
+    },
+    "/publish/{name}": {
+      "get": {
+        "operationId": "getPublish",
+        "summary": "Poll publish status",
+        "servers": [{ "url": "http://127.0.0.1:8765" }],
+        "tags": ["Publish"],
+        "parameters": [
+          { "name": "name", "in": "path", "required": true, "schema": { "type": "string" }, "description": "The app name used in POST /publish." }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current status",
+            "content": { "application/json": { "schema": { "oneOf": [ { "$ref": "#/components/schemas/PublishLive" }, { "$ref": "#/components/schemas/PublishPending" } ] } } }
+          },
+          "404": { "description": "Never published or fully revoked" }
+        }
+      },
+      "delete": {
+        "operationId": "unpublish",
+        "summary": "Stop a live app (keeps approval)",
+        "description": "Removes the live route but keeps the owner's approval, so a subsequent POST /publish is immediately live.",
+        "servers": [{ "url": "http://127.0.0.1:8765" }],
+        "tags": ["Publish"],
+        "parameters": [
+          { "name": "name", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Route removed" } }
+      }
+    },
+    "/status": {
+      "get": {
+        "operationId": "status",
+        "summary": "Agent connection state + published apps",
+        "servers": [{ "url": "http://127.0.0.1:8765" }],
+        "tags": ["Publish"],
+        "responses": {
+          "200": {
+            "description": "Current state",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Status" } } }
+          }
+        }
+      }
+    },
+    "/oauth/authorize": {
+      "get": {
+        "operationId": "authorize",
+        "summary": "Start the OAuth authorization-code flow (PKCE S256)",
+        "description": "Redirect the user here. On approval the browser is redirected to redirect_uri with a code and state.",
+        "servers": [{ "url": "https://account.meradomo.com" }],
+        "tags": ["Connect (OAuth)"],
+        "parameters": [
+          { "name": "client_id", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "redirect_uri", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Must exactly match a registered URI." },
+          { "name": "response_type", "in": "query", "required": true, "schema": { "type": "string", "enum": ["code"] } },
+          { "name": "state", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "code_challenge", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "code_challenge_method", "in": "query", "required": true, "schema": { "type": "string", "enum": ["S256"] } },
+          { "name": "scope", "in": "query", "required": true, "schema": { "type": "string", "enum": ["connect"] } }
+        ],
+        "responses": {
+          "302": { "description": "Redirect to redirect_uri?code=…&state=… (or ?error=access_denied)" }
+        }
+      }
+    },
+    "/oauth/token": {
+      "post": {
+        "operationId": "token",
+        "summary": "Exchange a code or refresh token for an access token",
+        "servers": [{ "url": "https://account.meradomo.com" }],
+        "tags": ["Connect (OAuth)"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": { "$ref": "#/components/schemas/TokenRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tokens",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TokenResponse" } } }
+          },
+          "400": {
+            "description": "OAuth error",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OAuthError" } } }
+          }
+        }
+      }
+    },
+    "/auth/pubkey": {
+      "get": {
+        "operationId": "pubkey",
+        "summary": "Fetch the token-signing public key (PEM)",
+        "servers": [{ "url": "https://account.meradomo.com" }],
+        "tags": ["Connect (OAuth)"],
+        "responses": {
+          "200": {
+            "description": "Ed25519 public key",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "publicKey": { "type": "string" } } } } }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PublishRequest": {
+        "type": "object",
+        "required": ["name", "label", "localPort"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z0-9-]{1,63}$", "description": "Subdomain label (notes → notes.you.meradomo.com). Not www, portal, or the customer name." },
+          "label": { "type": "string", "description": "Human-readable name shown in the menu-bar app." },
+          "localPort": { "type": "integer", "description": "The local port your app listens on." }
+        }
+      },
+      "PublishLive": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["live"] },
+          "host": { "type": "string", "example": "notes.you.meradomo.com" },
+          "url": { "type": "string", "example": "https://notes.you.meradomo.com" }
+        }
+      },
+      "PublishPending": {
+        "type": "object",
+        "properties": { "status": { "type": "string", "enum": ["pending"] } }
+      },
+      "Status": {
+        "type": "object",
+        "properties": {
+          "connected": { "type": "boolean" },
+          "host": { "type": "string" },
+          "name": { "type": "string" },
+          "url": { "type": "string" },
+          "pendingApps": { "type": "integer" },
+          "apps": { "type": "array", "items": { "type": "object" } }
+        }
+      },
+      "TokenRequest": {
+        "type": "object",
+        "properties": {
+          "grant_type": { "type": "string", "enum": ["authorization_code", "refresh_token"] },
+          "code": { "type": "string" },
+          "redirect_uri": { "type": "string" },
+          "client_id": { "type": "string" },
+          "client_secret": { "type": "string", "description": "Confidential clients only." },
+          "code_verifier": { "type": "string" },
+          "refresh_token": { "type": "string" }
+        }
+      },
+      "TokenResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": { "type": "string" },
+          "token_type": { "type": "string", "enum": ["Bearer"] },
+          "expires_in": { "type": "integer", "example": 600 },
+          "refresh_token": { "type": "string" },
+          "scope": { "type": "string", "example": "connect" },
+          "address": { "type": "string", "example": "https://you.meradomo.com" },
+          "host": { "type": "string", "example": "you.meradomo.com" }
+        }
+      },
+      "OAuthError": {
+        "type": "object",
+        "properties": { "error": { "type": "string", "example": "invalid_grant" } }
+      }
+    }
+  }
+}
