@@ -1,0 +1,10 @@
+/* Meradomo design-system alignment for the docs (Mintlify custom CSS).
+   Warm paper canvas, teal accent, weights capped at 590. Values mirror
+   meradomo/design/tokens.css; edit there first. */
+:root {
+  --md-paper: #faf9f7;
+  --md-ink: #221f1c;
+  --md-line: #e7e4df;
+}
+h1, h2, h3, h4, strong, b { font-weight: 590; }
+h1 { letter-spacing: -0.022em; }
