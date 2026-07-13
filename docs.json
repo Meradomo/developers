@@ -2,11 +2,11 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "Meradomo",
-  "description": "Build apps that run on a user's own computer and reach them from anywhere — through Meradomo.",
+  "description": "Build apps that run on a user's own computer and reach them from anywhere, through Meradomo.",
   "colors": {
     "primary": "#2199B5",
-    "light": "#46b3ca",
-    "dark": "#14829c"
+    "light": "#5EC3D7",
+    "dark": "#0A6F88"
   },
   "logo": {
     "light": "/logo/light.svg",
@@ -20,7 +20,10 @@
         "groups": [
           {
             "group": "Get started",
-            "pages": ["introduction", "quickstart"]
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
           },
           {
             "group": "Guides",
@@ -44,7 +47,9 @@
         "groups": [
           {
             "group": "API reference",
-            "pages": ["api-reference/introduction"]
+            "pages": [
+              "api-reference/introduction"
+            ]
           },
           {
             "group": "Endpoints",
@@ -56,7 +61,10 @@
   },
   "navbar": {
     "links": [
-      { "label": "Apps", "href": "https://meradomo.com/apps" }
+      {
+        "label": "Apps",
+        "href": "https://meradomo.com/apps"
+      }
     ],
     "primary": {
       "type": "button",
@@ -68,5 +76,20 @@
     "socials": {
       "website": "https://meradomo.com"
     }
+  },
+  "background": {
+    "color": {
+      "light": "#FAF9F7",
+      "dark": "#151311"
+    }
+  },
+  "fonts": {
+    "family": "Inter"
+  },
+  "appearance": {
+    "default": "system"
+  },
+  "styling": {
+    "eyebrows": "breadcrumbs"
   }
 }
