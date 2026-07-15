@@ -80,14 +80,14 @@
   "background": {
     "color": {
       "light": "#FAF9F7",
-      "dark": "#151311"
+      "dark": "#0a0a0c"
     }
   },
   "fonts": {
     "family": "Inter"
   },
   "appearance": {
-    "default": "system"
+    "default": "dark"
   },
   "styling": {
     "eyebrows": "breadcrumbs"
