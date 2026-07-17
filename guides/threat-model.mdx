@@ -1,0 +1,215 @@
+---
+title: "Threat model"
+description: "What Meradomo protects, who it protects against, and the limits we will state plainly."
+---
+
+This page is the formal companion to the [security model](/guides/security-model). The security model
+describes what your app can trust. This page describes *why* that trust is warranted, what it does
+**not** cover, and exactly what each party in the system can observe.
+
+Every statement here describes how Meradomo is built today. Where a protection is a consequence of
+architecture, we say so. Where it is a consequence of policy — something we choose not to do, rather
+than something we cannot do — we say that instead, because the difference is the whole point.
+
+## Assets
+
+What is worth protecting, in rough order of severity if lost:
+
+| Asset | Where it lives |
+| --- | --- |
+| The content of requests and responses (your app's data) | The user's computer, and the visitor's device |
+| The private key for the user's address | The user's computer only — generated there, never transmitted |
+| The user's account identity (email, name) | The control plane |
+| Device credentials (what a computer proves to connect) | The user's computer; stored **hashed** in the control plane |
+| The list of apps a user runs | The user's computer; app labels are visible in the address (see below) |
+
+## Adversaries
+
+We design against four, and state our limits against each.
+
+<Note>
+  **Meradomo itself is in this list on purpose.** A privacy claim that depends on our good behaviour
+  is a policy, not a guarantee. The architecture is built so that the strongest claim — that we cannot
+  read your traffic — does not require you to trust us.
+</Note>
+
+### 1. Meradomo, or anyone who compromises our shared infrastructure
+
+The shared address service forwards **sealed bytes**. It reads the requested hostname out of the TLS
+handshake without terminating TLS, then splices the raw connection through to the user's computer. It
+holds no key for a connected user's address, so it cannot decrypt the traffic — not by policy, but
+because the key material does not exist on that machine.
+
+This is the load-bearing property of the product. An operator with full access to our servers, or an
+attacker who takes them over, still cannot read request contents.
+
+### 2. A network attacker between the visitor and the user's computer
+
+Traffic is TLS-encrypted end to end, terminating on the user's computer. A network observer sees the
+same thing our own infrastructure sees, and no more: a hostname, byte counts, and timing.
+
+### 3. Other Meradomo customers (co-tenants)
+
+Tenancy is a data row, not a server. Every customer shares the same front door, so isolation is
+enforced at the point of admission rather than by separation of machines:
+
+- A computer proves a per-device credential on connect, and that credential is **re-verified on every
+  heartbeat**, not just at login.
+- A customer may only claim hostnames inside their own namespace — `<name>.meradomo.com` and labels
+  beneath it. An attempt to register a hostname belonging to another customer is refused at
+  registration time, which is what prevents address squatting.
+
+### 4. A lost or stolen device
+
+The user removes the device from their account. Because the credential is re-checked on every
+heartbeat, the removed computer is disconnected within seconds rather than at the next login. The same
+mechanism suspends an inactive account.
+
+## Trust boundaries
+
+There are three, and identity is re-established at each:
+
+1. **Visitor → shared address service.** Untrusted. The service does not decrypt; it only routes.
+2. **Shared address service → the user's computer.** Sealed bytes. TLS terminates here, on the user's
+   machine, with the user's own key.
+3. **The agent → your local app.** A loopback connection that is not reachable from the network. This
+   is the only boundary at which identity headers are trusted, and the agent is the only thing that can
+   write them.
+
+## What the shared address service can and cannot see
+
+This is the part most worth being precise about, because a vague answer here is indistinguishable from
+a dishonest one.
+
+**It can see:**
+
+- **The hostname** requested in the TLS handshake. Because published apps live at
+  `<app>.<name>.meradomo.com`, the hostname reveals **which user, and which app** a visitor is
+  reaching. We do not consider this hidden and you should not assume it is.
+- **The visitor's network address.** It is a direct connection to our front door. (Notably, we do *not*
+  pass this on — the agent never learns the visitor's address, so your app cannot log it either.)
+- **Byte counts and timing** of each connection, and therefore rough traffic volume and shape.
+- **Whether the user's computer is currently online**, which is how the asleep page is triggered.
+
+**It cannot see:**
+
+- The request method, path, or query string.
+- Any header, cookie, or authorization credential.
+- Request or response bodies — your app's actual data.
+- **Which person** is signed in. Identity is established on the user's computer, after decryption, and
+  is never visible to the shared infrastructure.
+
+The first list is the honest cost of routing a connection at all: something has to know where to send
+the bytes. The second list is the product.
+
+## Where the keys live
+
+The agent generates its own private key **on the user's computer**, writes it to disk readable only by
+that user, and never transmits it. Certificate issuance uses a signing request — the key itself never
+crosses the network, including to us.
+
+This is why we do not, and will not, terminate TLS centrally for connected users. A central service
+holding a wildcard key would be able to decrypt every customer's traffic. That design would be more
+convenient and is deliberately not the one we built.
+
+## What the control plane stores
+
+The control plane knows *who has an account* and *what they may connect*. It never sees traffic.
+
+**It stores:** account email and display name; the claimed name (hostname); device records, where the
+device credential is kept **only as a SHA-256 hash** — the credential itself is not recoverable from
+our database; subscription and billing status; and, for developer integrations, granted app
+authorizations.
+
+**It does not store:** request or response content, request paths, browsing or usage history, or any
+private key belonging to a user.
+
+The access log — who reached which app and when — is written **on the user's own computer**, not here.
+The shared infrastructure is architecturally incapable of producing that log, which is why it lives
+where it does.
+
+## Why identity headers cannot be forged
+
+Your app trusts `X-Meradomo-*` headers. That trust rests on two facts:
+
+1. **Inbound headers are deleted, not merged.** Before the agent forwards a request to your app, it
+   strips every inbound `X-Meradomo-*` and `X-Forwarded-*` header, and only then injects its own values
+   from its verified session state. A visitor who sends `X-Meradomo-Email: owner@example.com` has that
+   header removed — there is no path by which a supplied value survives.
+2. **The loopback hop is not routable.** The agent talks to your app over `127.0.0.1`. Nothing on the
+   network can reach that connection to inject a header directly.
+
+The same stripping applies to WebSocket upgrade requests, not just ordinary HTTP.
+
+## Revocation
+
+Removing an app's access, removing a device, or suspending an account all take effect within seconds,
+because the check is continuous rather than at-login:
+
+- **Apps**: the agent keeps a current list of authorized apps and refreshes it on a short poll. A
+  revoked app's requests stop being served on the next refresh.
+- **Devices and accounts**: verified on every heartbeat; a rejection disconnects the computer.
+
+## The one exception: the asleep page
+
+There is exactly one case where the shared service terminates TLS: when the user's computer is
+**offline**. It then obtains a short-lived certificate for that hostname and serves a static "this
+computer is asleep" page.
+
+Three properties bound this exception, and all three are structural:
+
+- It happens **only when no computer is connected** — there is by definition no traffic to intercept,
+  because the other end does not exist.
+- The key is held **in memory only**, for a short lifetime, and is never written to disk.
+- The page is a **fixed, pre-built response**. That code path can serve that one static page and
+  nothing else — it has no ability to forward a request anywhere. It is not a proxy that happens to be
+  serving a page; it cannot proxy.
+
+The moment the user's computer reconnects, routing returns to sealed passthrough and the relay again
+holds no key for that address.
+
+## What this model does **not** protect against
+
+Stating these plainly is part of the model.
+
+- **A compromised user computer.** Everything decrypts there. If that machine is compromised, the data
+  is compromised. Meradomo protects the path, not the endpoint.
+- **A compromised visitor device.** Same reasoning at the other end.
+- **Traffic analysis.** Hostname, timing, and volume are visible to us and to a network observer. Someone
+  watching can tell that you used a given app, and roughly how much — just not what you did in it.
+- **A malicious local app.** An app the user runs receives the identity headers and whatever data the
+  user gives it. Meradomo verifies *who is asking*; it does not sandbox what your app then does.
+- **A user who authorizes the wrong person.** Access granted is access granted. Revocation is fast, but
+  it is after the fact.
+- **Our own availability.** We can take the front door down — refuse to route, or suspend an account.
+  We cannot read the traffic, but we are in the path. That is the trade of a shared address.
+- **An adversarial Meradomo, on a `meradomo.com` address.** This one deserves a straight answer. Our
+  *deployed code* cannot decrypt your traffic — that is the whole design. But we operate the
+  `meradomo.com` zone, and whoever controls a zone can obtain a certificate for names beneath it. So
+  "we cannot decrypt" is a true statement about the system we run; it is not a statement about our
+  *position*. A future us, or someone who compromises us badly enough, could issue a certificate for
+  your address and terminate traffic there.
+
+  Two things constrain that, and we would rather point at them than pretend the gap does not exist:
+
+  1. **It is detectable.** Public certificates are logged in Certificate Transparency. A certificate
+     issued for your address that your own computer did not request is a public, permanent record.
+  2. **A custom domain removes it.** Bring your own hostname and you control the zone — issuance is
+     yours to authorize, and this residual risk goes away. If you want the guarantee to rest on
+     architecture rather than on our conduct, use a custom domain.
+
+## Summary
+
+One sentence, if you only read one: **we cannot read your data; we do know who you are, which app you
+reached, and when.** The second half is the honest cost of routing; the first half is the product.
+
+| Claim | Guaranteed by |
+| --- | --- |
+| We cannot read your traffic while your computer is online | Architecture — no key exists on our servers (on a `meradomo.com` address, bounded by our control of the zone — see above; a custom domain closes this) |
+| Your private key never leaves your computer | Architecture — generated locally, only a signing request is sent |
+| Identity headers cannot be forged by a visitor | Architecture — inbound headers stripped; loopback not routable |
+| Other customers cannot claim your address | Enforced at registration |
+| Revocation takes effect in seconds | Continuous re-verification, not at-login |
+| The asleep page cannot become a wiretap | Architecture — static response, no proxy path, key in memory only, offline only |
+| We do not log your request contents | Architecture — we never have them |
+| We do not sell or share your data | **Policy** — the one on this list that is a promise, not a property |
