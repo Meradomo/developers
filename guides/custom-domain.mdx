@@ -1,0 +1,93 @@
+---
+title: "Custom domains"
+description: "Serve a user's computer at a hostname they own, without Meradomo ever touching their DNS."
+---
+
+A Meradomo address looks like `kamran.meradomo.com`. A custom domain lets the same computer
+answer at a hostname the user owns — `files.kamran.com` — with the same apps, the same identity
+headers, and the same guarantees.
+
+Nothing about your app changes. This page explains the mechanism, because the design choice at
+the centre of it is the interesting part.
+
+## We never touch the user's zone
+
+This is the whole point, and it is worth being precise about.
+
+Most services that put your domain on their infrastructure ask for API access to your DNS
+provider, or ask you to move your nameservers to them. Meradomo does neither. The user
+publishes two records in their own zone; we read them and nothing else. We hold no credential
+for their domain and could not change it if we wanted to.
+
+That is enforced rather than promised: the DNS driver refuses to write any record outside
+`meradomo.com`, and there is a test whose only job is to assert it keeps refusing.
+
+## The two records
+
+| Type | Name | Points to |
+| --- | --- | --- |
+| CNAME | `files.kamran.com` | `kamran.meradomo.com` |
+| CNAME | `_acme-challenge.files.kamran.com` | `_acme-challenge.kamran.meradomo.com` |
+
+**The first is routing.** The user's hostname resolves to our front door, which reads the
+hostname out of the TLS handshake and splices the connection to their computer — still without
+decrypting anything. A custom domain does not change the blind pipe; the front door learns a
+different name and nothing else.
+
+**The second is certificate validation, delegated.** Their computer needs a certificate for
+their hostname, which means answering a DNS-01 challenge for it. Rather than take write access
+to their zone, the challenge is delegated: `_acme-challenge.<their-host>` is a CNAME to a record
+under *our* name, which our driver is already allowed to write.
+
+<Note>
+  **Why a CNAME rather than a one-off TXT.** A TXT would have to be re-published by hand at
+  every renewal — roughly every 60 days, forever, or the address silently stops working. The
+  CNAME is published once and renewal keeps working while the user never thinks about us again.
+  It costs one extra record at setup and saves an unbounded support burden.
+</Note>
+
+## How it goes
+
+<Steps>
+  <Step title="The user adds their hostname">
+    On their account page, under **Your own web address**. It starts as *Waiting for you* and the
+    exact records are shown, ready to copy.
+  </Step>
+  <Step title="They publish both records">
+    Wherever they manage their domain. New records typically appear within minutes.
+  </Step>
+  <Step title="They select Check now">
+    We resolve both records. If either is missing or points somewhere unexpected, the message
+    says which one and what it should say — not just "failed". The status becomes **Ready**.
+  </Step>
+  <Step title="Their computer picks it up">
+    The agent learns the verified hostname, requests a certificate covering it, and registers it
+    so the front door will route it. Adding a domain forces a fresh certificate rather than
+    waiting for the next renewal.
+  </Step>
+</Steps>
+
+## What this means for your app
+
+Nothing, which is the intent.
+
+Your app is reached at `<your-app>.files.kamran.com` exactly as it was at
+`<your-app>.kamran.meradomo.com`. The same verified `X-Meradomo-*` headers arrive, injected by
+the same agent after the same checks (see the [security model](/guides/security-model)). If you
+have hardcoded a `.meradomo.com` suffix anywhere, that is the one thing to revisit — read the
+`Host` header rather than assuming the domain.
+
+## Limits worth knowing
+
+- **One name per hostname.** A hostname routes for exactly the name that proved it. Another
+  customer pointing their computer at the same hostname is refused at registration — the same
+  anti-squatting check that protects Meradomo addresses.
+- **Verification is required before anything happens.** An unverified hostname is not routed and
+  is deliberately kept out of the certificate request: an unanswerable challenge would fail the
+  whole request and take the user's *real* address down with it.
+- **Removing the hostname stops it routing** immediately; certificates already issued remain
+  valid until they expire, as certificates do.
+- **A custom domain removes a residual risk, and that is a real reason to use one.** On a
+  `meradomo.com` address, we control the zone — so "we cannot decrypt your traffic" is true of
+  the software we run but not a property of our *position*. On the user's own domain, issuance is
+  theirs to authorise. See the [threat model](/guides/threat-model) for the full argument.

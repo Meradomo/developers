@@ -30,7 +30,9 @@
             "pages": [
               "guides/agent-api",
               "guides/oauth",
-              "guides/security-model"
+              "guides/security-model",
+              "guides/threat-model",
+              "guides/custom-domain"
             ]
           },
           {
