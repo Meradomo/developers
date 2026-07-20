@@ -1,0 +1,143 @@
+---
+title: "Embedded engine SDK"
+description: "Ship Meradomo inside your app so your users get a public address with one download, not two."
+---
+
+There are two ways to reach a user's local app through Meradomo. Pick the one that fits how you want
+your users to sign up and pay.
+
+## Which path?
+
+<CardGroup cols={1}>
+  <Card title="1. Detect the Meradomo app" icon="magnifying-glass">
+    Your app talks to a Meradomo app the user already installed, over the local
+    [Agent API](/guides/agent-api). Nothing to bundle. Best when your users already run Meradomo.
+    **The user downloads two apps.**
+  </Card>
+  <Card title="2. Embed the engine — Model A" icon="box">
+    Your app ships the Meradomo engine inside it. The user creates a Meradomo account and pays
+    Meradomo, but never downloads the Meradomo app. **One download.** This guide.
+  </Card>
+  <Card title="3. Embed the engine — Model B" icon="gauge">
+    Same embed, but **you** pay Meradomo for usage and bill your own users however you like — they
+    need no Meradomo account. *Coming soon.*
+  </Card>
+</CardGroup>
+
+All three serve at `https://<app>.<name>.meradomo.com` (or `<app>.<your-custom-domain>`), and all
+three keep the [blind-pipe guarantee](/guides/security-model): keys live only on the user's machine.
+
+## The shared engine
+
+The engine is a single background process that terminates TLS locally and connects out to the shared
+front door. When several engine-bundled apps run on one Mac they **share one engine** rather than each
+starting their own:
+
+- The first app to launch **spawns** the engine; the rest **discover and attach** to it.
+- The engine is **reference-counted**: it keeps serving while at least one app is attached and shuts
+  down a short grace window after the last one closes. It is **not** an always-on daemon.
+- The app the engine ships with is its **first-party app** and is **auto-approved**. Any *other* app
+  that attaches to a shared engine is **pending** until the owner approves it in their
+  [account dashboard](https://account.meradomo.com/account) — no menu-bar app required.
+
+## The engine bundle
+
+Produce a self-contained, checksummed bundle any app can drop into its resources:
+
+```sh
+scripts/build-engine-bundle.sh --out ./engine-bundle
+```
+
+It emits:
+
+```
+engine-bundle/
+  bundle.json                    # engineVersion, protocol, per-file SHA-256
+  resources/agent/agent.mjs      # the engine
+  resources/agent/bundle.json    # same manifest, read at runtime for the version
+  resources/*.html               # the pages the engine serves
+  sidecars/node-<triple>         # pinned Node runtime(s)
+  sidecars/frpc-<triple>         # pinned outbound client(s)
+```
+
+Every artifact's checksum is recorded in `bundle.json` and re-verified end to end, so a corrupted or
+tampered payload fails loudly instead of shipping.
+
+## Rust: the `meradomo-engine` crate
+
+A Tauri app adds the crate and calls one function. `connect()` walks the user through account +
+address + trial in their browser, then starts (or attaches to) the engine and publishes your app:
+
+```rust
+use meradomo_engine::{connect, ConnectRequest, EngineConfig};
+use std::time::Duration;
+
+let req = ConnectRequest {
+    control_plane: "https://account.meradomo.com",
+    app_id: "com.example.myapp",   // your app's id — also its first-party id
+    publish_name: "music",         // → music.<name>.meradomo.com
+    publish_label: "Music",
+    local_port: 3000,              // where your app is listening
+    poll_timeout: Duration::from_secs(5 * 60),
+};
+
+let connected = connect(
+    &req,
+    std::process::id(),
+    |url| open_in_browser(url),                 // send the user to sign in / pay
+    |token, host| save_credential(token, host), // persist for next launch
+    |token| EngineConfig {                       // built once the credential is known
+        node_bin, agent_path, frpc_bin,          // resolved from your bundled resources
+        device_token: token.into(),
+        control_plane: "https://account.meradomo.com".into(),
+        relay_addr: "connect.meradomo.com:7000".into(),
+        first_party_app: Some("com.example.myapp".into()),
+        ..EngineConfig::portal(/* … */)
+    },
+)?;
+
+println!("Live at {}", connected.publish.url.unwrap_or_default());
+```
+
+On the **next** launch, skip the browser: reuse the saved credential, call
+[`spawn_or_attach`](#reference), and `publish`. If a Meradomo app (or another embedded engine) is
+already running, `spawn_or_attach` **attaches** to it instead of starting a second engine.
+
+The worked example lives at `engine-launcher/examples/hello_meradomo.rs`.
+
+### Reference
+
+| Call | Does |
+|---|---|
+| `discover(base)` | read the engine's `/engine/info` (version, protocol, liveness) |
+| `spawn_or_attach(cfg, app_id, pid)` | attach to a running compatible engine, else spawn one |
+| `register` / `heartbeat` / `deregister` | join / refresh / leave the reference-counted lifecycle |
+| `connect(req, …)` | the full cold-start: browser onboarding → engine → publish |
+| `publish` / `unpublish` / `status` | manage this app's public route |
+| `EngineInfo::needs_renewal()` | true when the subscription lapsed — show a "renew" prompt |
+
+## Any language: the raw wire protocol
+
+The engine's management surface is plain HTTP over loopback (`http://127.0.0.1:8765`), JSON bodies in
+camelCase, no auth (loopback + same-user is the trust boundary — see
+[security model](/guides/security-model)):
+
+| Method & path | Body | Purpose |
+|---|---|---|
+| `GET /engine/info` | — | discovery: `{engineVersion, protocol, pid, connected, host, name, firstPartyApp, registrants, billing}` |
+| `POST /engine/register` | `{appId, pid}` | attach as a live consumer |
+| `POST /engine/heartbeat` | `{appId, pid}` | stay attached |
+| `POST /engine/deregister` | `{appId}` | leave (last one out winds the engine down) |
+| `POST /publish` | `{name, label, localPort, appId?}` | request a public address (first-party `appId` auto-approves) |
+| `GET /publish/:name` | — | poll publish status |
+| `DELETE /publish/:name` | — | unpublish (keeps approval) |
+| `GET /status` | — | connection state + published apps + billing standing |
+
+Attach to an incumbent engine only when its `protocol` matches yours; a different number means
+"incompatible — start your own".
+
+## Billing (Model A)
+
+Claiming an address starts a 14-day free trial, so a new user is live immediately. When a subscription
+lapses the engine reports `billing.status = "hold"` on `/engine/info` and `/status`, and the public
+route goes down. Read that signal and show a plain **"renew to keep serving"** prompt — never jargon.

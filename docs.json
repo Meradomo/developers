@@ -29,6 +29,7 @@
             "group": "Guides",
             "pages": [
               "guides/agent-api",
+              "guides/embedded-engine",
               "guides/oauth",
               "guides/security-model",
               "guides/threat-model",

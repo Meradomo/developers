@@ -47,6 +47,45 @@ that have been removed.
 - It does not share the user's data with third parties.
 - It does not retain copies of the private key.
 
+## The shared engine's trust boundary
+
+When you [embed the engine](/guides/embedded-engine), several apps can share one engine on the same
+machine. The trust boundary there is the **local machine and user account**, and it is enforced two ways:
+
+- **Loopback only.** The engine's management surface binds `127.0.0.1` — nothing off the machine can
+  reach it. Its private state (credential, cookie secret, keys) is written to the user's own
+  application-support directory with owner-only file permissions.
+- **Same user.** Any process running as the same user is already inside this boundary, so the
+  management surface has no secret of its own. This is the same trust level as a config file in your
+  home directory: a hostile process running as you could read it — but such a process has already
+  compromised the account.
+
+What this boundary is **not** asked to do is decide *who may reach the computer from the outside* — that
+is always the signed-identity check above, re-run on every request.
+
+### Approving apps
+
+Because any local app can ask the engine to publish, the engine separates the app it ships with from
+the rest:
+
+- The engine's **first-party app** (the app that bundled it, named at spawn) is **auto-approved** — it
+  goes live without a prompt.
+- **Any other app** that attaches to a shared engine is **pending** until the owner approves it in
+  their [account dashboard](https://account.meradomo.com/account). The approval travels to the engine
+  over the same signed, polled channel as membership and grants, so turning an app off takes effect
+  within one cycle.
+
+The first-party id is a *policy knob, not a secret*: a hostile same-user process is already past the
+boundary, so the point of the split is that an honest third-party app declares its own id and correctly
+lands in pending — never that the id is unguessable.
+
+### The identity headers stay non-spoofable
+
+Sharing an engine changes none of the identity guarantees above. The agent still strips every
+`X-Meradomo-*` and `X-Forwarded-*` header a visitor supplies and injects only the identity it verified
+itself, per app. One app attached to the engine cannot cause another's requests to carry a forged
+identity.
+
 ## Summary for app developers
 
 Your app receives a verified `X-Meradomo-Email` on every request. You do not need to implement
