@@ -72,11 +72,12 @@ tampered payload fails loudly instead of shipping.
 
 ## Rust: the `meradomo-engine` crate
 
-The launcher/client is open source (MIT) — [github.com/Meradomo/meradomo-engine](https://github.com/Meradomo/meradomo-engine):
+The launcher/client is open source (MIT) — on [crates.io](https://crates.io/crates/meradomo-engine),
+source at [github.com/Meradomo/meradomo-engine](https://github.com/Meradomo/meradomo-engine):
 
 ```toml
 [dependencies]
-meradomo-engine = { git = "https://github.com/Meradomo/meradomo-engine" }
+meradomo-engine = "0.1"
 ```
 
 A Tauri app adds the crate and calls one function. `connect()` walks the user through account +
