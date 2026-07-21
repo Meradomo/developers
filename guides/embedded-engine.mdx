@@ -42,13 +42,20 @@ starting their own:
 
 ## The engine bundle
 
-Produce a self-contained, checksummed bundle any app can drop into its resources:
+The engine binary (`agent.mjs` + a pinned Node runtime + the outbound client) is the Meradomo
+product, so it ships as a **pre-built, versioned, checksummed download**, indexed by a public manifest:
 
 ```sh
-scripts/build-engine-bundle.sh --out ./engine-bundle
+# Look up the current bundle:
+curl -s https://stmeraqqemciyamqs2e.blob.core.windows.net/releases/engine-sdk/manifest.json
+# → { engineVersion, protocol, bundle: { url, sha256, size }, crate, docs }
+
+# Download it, verify the checksum, and unpack:
+curl -sL "$(curl -s .../engine-sdk/manifest.json | jq -r .bundle.url)" -o engine-bundle.tar.gz
+mkdir engine-bundle && tar -xzf engine-bundle.tar.gz -C engine-bundle
 ```
 
-It emits:
+The unpacked bundle is:
 
 ```
 engine-bundle/
@@ -64,6 +71,13 @@ Every artifact's checksum is recorded in `bundle.json` and re-verified end to en
 tampered payload fails loudly instead of shipping.
 
 ## Rust: the `meradomo-engine` crate
+
+The launcher/client is open source (MIT) — [github.com/Meradomo/meradomo-engine](https://github.com/Meradomo/meradomo-engine):
+
+```toml
+[dependencies]
+meradomo-engine = { git = "https://github.com/Meradomo/meradomo-engine" }
+```
 
 A Tauri app adds the crate and calls one function. `connect()` walks the user through account +
 address + trial in their browser, then starts (or attaches to) the engine and publishes your app:
