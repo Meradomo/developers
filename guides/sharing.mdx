@@ -19,7 +19,7 @@ borrow — its owner shares from the menu bar instead. See
 
 ## What it looks like to the person invited
 
-1. They get an email: **"Kamran shared Music with you"**, naming your app and its own
+1. They get an email: **"owner@example.com shared Music with you"**, naming your app and its own
    address — not a generic front page.
 2. They click once. That signs them in *and* accepts.
 3. They land in your app, already able to use it. Nothing refuses them on arrival,
@@ -86,9 +86,9 @@ curl -s http://127.0.0.1:8765/people -H "x-engine-capability: $CAP"
 
 ```json
 {
-  "name": "kamran",
+  "name": "example",
   "members": [
-    { "email": "kamran@example.com", "accountId": "8dc…", "role": "owner",
+    { "email": "owner@example.com", "accountId": "8dc…", "role": "owner",
       "status": "active", "apps": [] },
     { "email": "sam@example.com", "accountId": "4fd…", "role": "member",
       "status": "pending", "apps": ["Music"] }
@@ -119,7 +119,7 @@ curl -s -X POST http://127.0.0.1:8765/people/invite \
 
 ```json
 { "email": "sam@example.com", "status": "pending",
-  "url": "https://music.kamran.meradomo.com" }
+  "url": "https://music.example.meradomo.com" }
 ```
 
 The label in `apps` must be one this computer actually serves (`publishedApps` above), and
