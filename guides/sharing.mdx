@@ -67,12 +67,16 @@ people: the key comes from registering, not from having spawned the engine.
 
 | Call | Does |
 |---|---|
-| `GET /people` | Everyone with access, and the apps you may hand over |
-| `POST /people/invite` | Invite by email, granting your app in the same step |
-| `POST /people/grant` | Give or withdraw one app for one person |
-| `POST /people/revoke` | Remove somebody from the computer entirely |
+| [`GET /people`](/api-reference/people/who-can-reach-this-computer) | Everyone with access, and the apps you may hand over |
+| [`POST /people/invite`](/api-reference/people/invite-somebody-by-email) | Invite by email, granting your app in the same step |
+| [`POST /people/grant`](/api-reference/people/give-or-withdraw-one-app) | Give or withdraw one app for one person |
+| [`POST /people/revoke`](/api-reference/people/remove-somebody) | Remove somebody from the computer entirely |
 
-Full request and response shapes are in the **API reference** tab, under Endpoints.
+The engine lifecycle that earns the capability is documented too:
+[discover](/api-reference/engine/discover-a-running-engine),
+[attach](/api-reference/engine/attach-to-the-shared-engine),
+[stay attached](/api-reference/engine/stay-attached),
+[detach](/api-reference/engine/detach).
 
 ### Reading the list
 
