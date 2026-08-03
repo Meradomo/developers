@@ -1,0 +1,200 @@
+---
+title: "Share your app with other people"
+description: "Let your users hand access to somebody else — from inside your app, with no browser and nothing extra to install."
+---
+
+Your app runs on somebody's computer and Meradomo gives it an address. This is the next
+question they ask: **can my partner use it too?**
+
+An app that bundles the engine can answer yes without sending anyone to a browser, and
+without either person installing anything of ours. You call four endpoints; Meradomo
+sends the invitation, signs the person in, and enforces the access.
+
+<Note>
+Needs the **embedded engine**. An app taking the [detect-the-app path](/guides/agent-api)
+has no engine of its own, and the running Meradomo app's credential is not yours to
+borrow — its owner shares from the menu bar instead. See
+[Embed the engine](/guides/embedded-engine).
+</Note>
+
+## What it looks like to the person invited
+
+1. They get an email: **"Kamran shared Music with you"**, naming your app and its own
+   address — not a generic front page.
+2. They click once. That signs them in *and* accepts.
+3. They land in your app, already able to use it. Nothing refuses them on arrival,
+   because the access was granted when the invitation was sent.
+
+If the owner has a [custom domain](/guides/custom-domain), the invitation names that.
+
+## The two limits, stated plainly
+
+Worth knowing before you design a screen around this:
+
+- **An invitation grants the apps you name and nothing else.** Somebody invited to your
+  app cannot reach anything else on that computer.
+- **Only the owner can invite.** Somebody they shared with cannot invite anyone. There is
+  no "share onward".
+
+## Getting the key
+
+These routes change who can reach a person's computer, so unlike the rest of the local
+API they are guarded. **Registering is what earns the key:**
+
+```bash
+curl -s -X POST http://127.0.0.1:8765/engine/register \
+  -H 'content-type: application/json' \
+  -d '{"appId":"com.example.myapp","pid":4213}'
+```
+
+```json
+{ "ok": true, "protocol": 1, "registrants": 1, "capability": "8f2c…" }
+```
+
+Send it as `x-engine-capability` on every call below.
+
+<Warning>
+The capability is minted per engine **run** and held only in memory. One from a previous
+run is worthless, so re-register after an engine restarts rather than caching it forever.
+`register` is idempotent — calling it before each request is fine, and is what the Rust
+crate does.
+</Warning>
+
+This is also why an app that **attached** to an engine somebody else started can manage
+people: the key comes from registering, not from having spawned the engine.
+
+## The four calls
+
+| Call | Does |
+|---|---|
+| `GET /people` | Everyone with access, and the apps you may hand over |
+| `POST /people/invite` | Invite by email, granting your app in the same step |
+| `POST /people/grant` | Give or withdraw one app for one person |
+| `POST /people/revoke` | Remove somebody from the computer entirely |
+
+Full request and response shapes are in the **API reference** tab, under Endpoints.
+
+### Reading the list
+
+```bash
+curl -s http://127.0.0.1:8765/people -H "x-engine-capability: $CAP"
+```
+
+```json
+{
+  "name": "kamran",
+  "members": [
+    { "email": "kamran@example.com", "accountId": "8dc…", "role": "owner",
+      "status": "active", "apps": [] },
+    { "email": "sam@example.com", "accountId": "4fd…", "role": "member",
+      "status": "pending", "apps": ["Music"] }
+  ],
+  "publishedApps": ["Music"]
+}
+```
+
+**Filter it to your own app.** The list describes the whole computer, and somebody shared
+a *different* app has no more access to yours than a stranger — showing them would tell
+the owner otherwise:
+
+```
+members.filter(m => m.status !== 'revoked')
+       .filter(m => m.role === 'owner' || m.apps.includes(YOUR_LABEL))
+```
+
+Drop `revoked` entirely. The row survives upstream so the owner can see the removal
+happened; in your app the question is only "who can open this".
+
+### Inviting
+
+```bash
+curl -s -X POST http://127.0.0.1:8765/people/invite \
+  -H "x-engine-capability: $CAP" -H 'content-type: application/json' \
+  -d '{"email":"sam@example.com","apps":["Music"]}'
+```
+
+```json
+{ "email": "sam@example.com", "status": "pending",
+  "url": "https://music.kamran.meradomo.com" }
+```
+
+The label in `apps` must be one this computer actually serves (`publishedApps` above), and
+it is the app's **display label** — the same one you passed as `label` when you published,
+not the address label. Anything else is refused rather than quietly dropped, so the owner
+is never told they shared something they did not.
+
+### Removing
+
+Two different things, and picking the wrong one is a real mistake:
+
+| You want | Call |
+|---|---|
+| Take away **your app** | `POST /people/grant` with `granted: false` |
+| Remove them from the **whole computer** | `POST /people/revoke` |
+
+From inside your app, prefer the first. They may have been shared something else, and
+taking that away is not your app's decision to make.
+
+<Warning>
+Always confirm before removing. It ends access and cannot be undone without a fresh
+invitation, and a row in a list is exactly where a stray tap lands.
+</Warning>
+
+## Telling your owner apart from your visitors
+
+Every forwarded request carries the visitor's verified identity, so your app can show the
+owner controls a visitor must not see:
+
+| Header | Value |
+|---|---|
+| `X-Meradomo-User` | stable account id — key per-person data on this |
+| `X-Meradomo-Email` | their address |
+| `X-Meradomo-Role` | `owner` or `member` |
+| `X-Meradomo-App` | your app's label |
+
+<Warning>
+**Do not decide this from the connection address.** The engine proxies to `127.0.0.1`, so
+**every** visitor arrives from loopback — a phone on the other side of the world included.
+Trusting loopback here hands your owner's controls to everybody. Use `X-Meradomo-Role`.
+
+Any copy of these headers the visitor sent is stripped before the real ones are written,
+which is what makes them trustworthy. See the [security model](/guides/security-model).
+</Warning>
+
+Key per-person data on `X-Meradomo-User`, not the email — that is what lets somebody
+change address without losing everything they had.
+
+## Refusals are written to be read
+
+Meradomo decides what counts as an address, which apps may be granted, and how often
+invitations may be sent — the same rate limit that guards sign-in links. Its refusals come
+back in words meant for a person:
+
+```json
+{ "error": "that does not look like an email address" }
+{ "error": "you have not shared an app called Photos" }
+```
+
+Show them. Replacing them with wording of your own loses the part that says what to do
+next. A `429` means the invitation budget is spent; say so and let them try later.
+
+## In Rust
+
+The [`meradomo-engine`](https://docs.rs/meradomo-engine) crate wraps all of this:
+
+```rust
+use meradomo_engine::{invite, people, grant, revoke};
+
+let listed = people(mgmt_base)?;                                   // who has access
+invite(mgmt_base, "them@example.com", &["Music".into()])?;         // invite + grant
+grant(mgmt_base, &person.account_id, "Music", false)?;             // withdraw your app
+revoke(mgmt_base, &person.account_id)?;                            // remove entirely
+```
+
+`register` (or `spawn_or_attach`) collects the capability for you; the calls return
+[`PeopleError::NotAttached`](https://docs.rs/meradomo-engine) until it has.
+`PeopleError::Refused` carries the message above verbatim.
+
+Every method talks over the network with a blocking client — **call them off your async
+runtime** (`tokio::task::spawn_blocking` or equivalent), or you will stall the thread
+serving your app.
