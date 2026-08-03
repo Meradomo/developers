@@ -3,12 +3,20 @@
   "info": {
     "title": "Meradomo Public API",
     "version": "1.0.0",
-    "description": "Two surfaces: the local management API on 127.0.0.1:8765 (Publish) and the OAuth endpoints on account.meradomo.com (Connect). No SDK — these HTTP endpoints are the integration surface.",
-    "license": { "name": "MIT" }
+    "description": "Two surfaces: the local management API on 127.0.0.1:8765 (Publish) and the OAuth endpoints on account.meradomo.com (Connect). No SDK \u2014 these HTTP endpoints are the integration surface.",
+    "license": {
+      "name": "MIT"
+    }
   },
   "servers": [
-    { "url": "http://127.0.0.1:8765", "description": "Local management API (Publish)" },
-    { "url": "https://account.meradomo.com", "description": "Control plane (Connect / OAuth)" }
+    {
+      "url": "http://127.0.0.1:8765",
+      "description": "Local management API (Publish)"
+    },
+    {
+      "url": "https://account.meradomo.com",
+      "description": "Control plane (Connect / OAuth)"
+    }
   ],
   "paths": {
     "/publish": {
@@ -16,24 +24,44 @@
         "operationId": "publish",
         "summary": "Publish a local app",
         "description": "Request that a locally-running app be made reachable. First call returns 202 pending (awaiting owner approval); once approved, returns 200 live.",
-        "servers": [{ "url": "http://127.0.0.1:8765" }],
-        "tags": ["Publish"],
+        "servers": [
+          {
+            "url": "http://127.0.0.1:8765"
+          }
+        ],
+        "tags": [
+          "Publish"
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/PublishRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/PublishRequest"
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Already approved — immediately live",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PublishLive" } } }
+            "description": "Already approved \u2014 immediately live",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishLive"
+                }
+              }
+            }
           },
           "202": {
-            "description": "First time — waiting for owner approval",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PublishPending" } } }
+            "description": "First time \u2014 waiting for owner approval",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishPending"
+                }
+              }
+            }
           }
         }
       }
@@ -42,41 +70,99 @@
       "get": {
         "operationId": "getPublish",
         "summary": "Poll publish status",
-        "servers": [{ "url": "http://127.0.0.1:8765" }],
-        "tags": ["Publish"],
+        "servers": [
+          {
+            "url": "http://127.0.0.1:8765"
+          }
+        ],
+        "tags": [
+          "Publish"
+        ],
         "parameters": [
-          { "name": "name", "in": "path", "required": true, "schema": { "type": "string" }, "description": "The app name used in POST /publish." }
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The app name used in POST /publish."
+          }
         ],
         "responses": {
           "200": {
             "description": "Current status",
-            "content": { "application/json": { "schema": { "oneOf": [ { "$ref": "#/components/schemas/PublishLive" }, { "$ref": "#/components/schemas/PublishPending" } ] } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/PublishLive"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PublishPending"
+                    }
+                  ]
+                }
+              }
+            }
           },
-          "404": { "description": "Never published or fully revoked" }
+          "404": {
+            "description": "Never published or fully revoked"
+          }
         }
       },
       "delete": {
         "operationId": "unpublish",
         "summary": "Stop a live app (keeps approval)",
         "description": "Removes the live route but keeps the owner's approval, so a subsequent POST /publish is immediately live.",
-        "servers": [{ "url": "http://127.0.0.1:8765" }],
-        "tags": ["Publish"],
-        "parameters": [
-          { "name": "name", "in": "path", "required": true, "schema": { "type": "string" } }
+        "servers": [
+          {
+            "url": "http://127.0.0.1:8765"
+          }
         ],
-        "responses": { "200": { "description": "Route removed" } }
+        "tags": [
+          "Publish"
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Route removed"
+          }
+        }
       }
     },
     "/status": {
       "get": {
         "operationId": "status",
         "summary": "Agent connection state + published apps",
-        "servers": [{ "url": "http://127.0.0.1:8765" }],
-        "tags": ["Publish"],
+        "servers": [
+          {
+            "url": "http://127.0.0.1:8765"
+          }
+        ],
+        "tags": [
+          "Publish"
+        ],
         "responses": {
           "200": {
             "description": "Current state",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Status" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
           }
         }
       }
@@ -86,19 +172,86 @@
         "operationId": "authorize",
         "summary": "Start the OAuth authorization-code flow (PKCE S256)",
         "description": "Redirect the user here. On approval the browser is redirected to redirect_uri with a code and state.",
-        "servers": [{ "url": "https://account.meradomo.com" }],
-        "tags": ["Connect (OAuth)"],
+        "servers": [
+          {
+            "url": "https://account.meradomo.com"
+          }
+        ],
+        "tags": [
+          "Connect (OAuth)"
+        ],
         "parameters": [
-          { "name": "client_id", "in": "query", "required": true, "schema": { "type": "string" } },
-          { "name": "redirect_uri", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Must exactly match a registered URI." },
-          { "name": "response_type", "in": "query", "required": true, "schema": { "type": "string", "enum": ["code"] } },
-          { "name": "state", "in": "query", "required": true, "schema": { "type": "string" } },
-          { "name": "code_challenge", "in": "query", "required": true, "schema": { "type": "string" } },
-          { "name": "code_challenge_method", "in": "query", "required": true, "schema": { "type": "string", "enum": ["S256"] } },
-          { "name": "scope", "in": "query", "required": true, "schema": { "type": "string", "enum": ["connect"] } }
+          {
+            "name": "client_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Must exactly match a registered URI."
+          },
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "code"
+              ]
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code_challenge",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code_challenge_method",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "S256"
+              ]
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "connect"
+              ]
+            }
+          }
         ],
         "responses": {
-          "302": { "description": "Redirect to redirect_uri?code=…&state=… (or ?error=access_denied)" }
+          "302": {
+            "description": "Redirect to redirect_uri?code=\u2026&state=\u2026 (or ?error=access_denied)"
+          }
         }
       }
     },
@@ -106,24 +259,44 @@
       "post": {
         "operationId": "token",
         "summary": "Exchange a code or refresh token for an access token",
-        "servers": [{ "url": "https://account.meradomo.com" }],
-        "tags": ["Connect (OAuth)"],
+        "servers": [
+          {
+            "url": "https://account.meradomo.com"
+          }
+        ],
+        "tags": [
+          "Connect (OAuth)"
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/x-www-form-urlencoded": {
-              "schema": { "$ref": "#/components/schemas/TokenRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequest"
+              }
             }
           }
         },
         "responses": {
           "200": {
             "description": "Tokens",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TokenResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
           },
           "400": {
             "description": "OAuth error",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OAuthError" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
           }
         }
       }
@@ -132,12 +305,545 @@
       "get": {
         "operationId": "pubkey",
         "summary": "Fetch the token-signing public key (PEM)",
-        "servers": [{ "url": "https://account.meradomo.com" }],
-        "tags": ["Connect (OAuth)"],
+        "servers": [
+          {
+            "url": "https://account.meradomo.com"
+          }
+        ],
+        "tags": [
+          "Connect (OAuth)"
+        ],
         "responses": {
           "200": {
             "description": "Ed25519 public key",
-            "content": { "application/json": { "schema": { "type": "object", "properties": { "publicKey": { "type": "string" } } } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "publicKey": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/engine/info": {
+      "get": {
+        "operationId": "engineInfo",
+        "summary": "Discover a running engine",
+        "description": "Version, wire protocol, liveness and billing standing. No auth \u2014 a launching app needs this to decide whether to attach to a running engine or start its own. Attach only when `protocol` matches yours.",
+        "servers": [
+          {
+            "url": "http://127.0.0.1:8765"
+          }
+        ],
+        "tags": [
+          "Engine"
+        ],
+        "responses": {
+          "200": {
+            "description": "Engine identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "engineVersion": {
+                      "type": "string"
+                    },
+                    "protocol": {
+                      "type": "integer",
+                      "example": 1
+                    },
+                    "pid": {
+                      "type": "integer"
+                    },
+                    "mode": {
+                      "type": "string"
+                    },
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "host": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "name": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "firstPartyApp": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "registrants": {
+                      "type": "integer"
+                    },
+                    "billing": {
+                      "type": "object",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/engine/register": {
+      "post": {
+        "operationId": "engineRegister",
+        "summary": "Attach to the shared engine",
+        "description": "Counts your app as a live consumer so the reference-counted engine keeps serving while you are open \u2014 and returns the **capability** the People endpoints require. Registering is what proves you are a real app on this machine, which is why an app that attached to an engine somebody else spawned can still manage people. Idempotent.",
+        "servers": [
+          {
+            "url": "http://127.0.0.1:8765"
+          }
+        ],
+        "tags": [
+          "Engine"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "appId"
+                ],
+                "properties": {
+                  "appId": {
+                    "type": "string",
+                    "example": "com.example.myapp"
+                  },
+                  "pid": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Attached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "appId": {
+                      "type": "string"
+                    },
+                    "protocol": {
+                      "type": "integer"
+                    },
+                    "registrants": {
+                      "type": "integer"
+                    },
+                    "capability": {
+                      "type": "string",
+                      "description": "Send as x-engine-capability on every People call."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/engine/heartbeat": {
+      "post": {
+        "operationId": "engineHeartbeat",
+        "summary": "Stay attached",
+        "description": "Refreshes your registration. An app that stops heartbeating (or whose pid dies) is reaped, so a crash still releases the engine.",
+        "servers": [
+          {
+            "url": "http://127.0.0.1:8765"
+          }
+        ],
+        "tags": [
+          "Engine"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "appId"
+                ],
+                "properties": {
+                  "appId": {
+                    "type": "string"
+                  },
+                  "pid": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Still attached"
+          }
+        }
+      }
+    },
+    "/engine/deregister": {
+      "post": {
+        "operationId": "engineDeregister",
+        "summary": "Detach",
+        "description": "A clean exit. When this drops the **last** registrant the engine stops serving after a short grace window \u2014 it is app-lifetime, not a background daemon.",
+        "servers": [
+          {
+            "url": "http://127.0.0.1:8765"
+          }
+        ],
+        "tags": [
+          "Engine"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "appId"
+                ],
+                "properties": {
+                  "appId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Detached"
+          }
+        }
+      }
+    },
+    "/people": {
+      "get": {
+        "operationId": "people",
+        "summary": "Who can reach this computer",
+        "description": "Everyone with access, plus `publishedApps` \u2014 the labels an invitation may hand over. Filter to the apps you actually serve: listing everybody with access to the computer would tell the owner that somebody who cannot open your app has access to it.",
+        "servers": [
+          {
+            "url": "http://127.0.0.1:8765"
+          }
+        ],
+        "tags": [
+          "People"
+        ],
+        "parameters": [
+          {
+            "name": "x-engine-capability",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The capability returned by POST /engine/register. Minted per engine run; one from a previous run is worthless."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The people",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "email": {
+                            "type": "string"
+                          },
+                          "accountId": {
+                            "type": "string",
+                            "description": "Opaque id. Use this to grant or remove, never the address."
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "owner",
+                              "member"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "active",
+                              "pending",
+                              "revoked"
+                            ],
+                            "description": "active = accepted; pending = invited; revoked = removed."
+                          },
+                          "apps": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "App labels this person may open."
+                          }
+                        }
+                      }
+                    },
+                    "publishedApps": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No (or wrong) capability. Register first."
+          },
+          "503": {
+            "description": "Not connected to an account yet, or the service could not be reached."
+          }
+        }
+      }
+    },
+    "/people/invite": {
+      "post": {
+        "operationId": "peopleInvite",
+        "summary": "Invite somebody by email",
+        "description": "Sends an invitation naming the apps it grants and their address. The grant is written immediately, so the app is reachable the moment they accept.\n\nApps must be ones this computer actually serves; anything else is refused rather than quietly dropped. Rate-limited on the same budget as sign-in links \u2014 a 429 here is a 429 upstream.",
+        "servers": [
+          {
+            "url": "http://127.0.0.1:8765"
+          }
+        ],
+        "tags": [
+          "People"
+        ],
+        "parameters": [
+          {
+            "name": "x-engine-capability",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The capability returned by POST /engine/register. Minted per engine run; one from a previous run is worthless."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "apps": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "App labels to grant. Omit to invite without granting anything."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Invited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "email": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "pending"
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "Where the invitation points, when it named an app."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Refused, in words meant to be shown to a person \u2014 e.g. `that does not look like an email address`, or `you have not shared an app called Photos`. Show the message."
+          },
+          "403": {
+            "description": "No (or wrong) capability. Register first."
+          },
+          "429": {
+            "description": "Too many invitations. Same budget as sign-in links."
+          },
+          "503": {
+            "description": "Not connected to an account yet, or the service could not be reached."
+          }
+        }
+      }
+    },
+    "/people/grant": {
+      "post": {
+        "operationId": "peopleGrant",
+        "summary": "Give or withdraw one app",
+        "description": "Absence is denial, so publishing a new app never silently widens what people already invited can see. Withdrawing takes effect within one poll cycle.",
+        "servers": [
+          {
+            "url": "http://127.0.0.1:8765"
+          }
+        ],
+        "tags": [
+          "People"
+        ],
+        "parameters": [
+          {
+            "name": "x-engine-capability",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The capability returned by POST /engine/register. Minted per engine run; one from a previous run is worthless."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "accountId",
+                  "app",
+                  "granted"
+                ],
+                "properties": {
+                  "accountId": {
+                    "type": "string"
+                  },
+                  "app": {
+                    "type": "string"
+                  },
+                  "granted": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated"
+          },
+          "403": {
+            "description": "No (or wrong) capability. Register first."
+          },
+          "404": {
+            "description": "No such person."
+          },
+          "503": {
+            "description": "Not connected to an account yet, or the service could not be reached."
+          }
+        }
+      }
+    },
+    "/people/revoke": {
+      "post": {
+        "operationId": "peopleRevoke",
+        "summary": "Remove somebody",
+        "description": "Ends their access to the whole computer. To remove them from **your app only**, use `/people/grant` with `granted: false` \u2014 they may have been shared something else, and taking that away is not your app's decision.",
+        "servers": [
+          {
+            "url": "http://127.0.0.1:8765"
+          }
+        ],
+        "tags": [
+          "People"
+        ],
+        "parameters": [
+          {
+            "name": "x-engine-capability",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The capability returned by POST /engine/register. Minted per engine run; one from a previous run is worthless."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "accountId"
+                ],
+                "properties": {
+                  "accountId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Removed"
+          },
+          "403": {
+            "description": "No (or wrong) capability. Register first."
+          },
+          "400": {
+            "description": "The owner cannot be removed from their own computer."
+          },
+          "503": {
+            "description": "Not connected to an account yet, or the service could not be reached."
           }
         }
       }
@@ -147,63 +853,155 @@
     "schemas": {
       "PublishRequest": {
         "type": "object",
-        "required": ["name", "label", "localPort"],
+        "required": [
+          "name",
+          "label",
+          "localPort"
+        ],
         "properties": {
-          "name": { "type": "string", "pattern": "^[a-z0-9-]{1,63}$", "description": "Subdomain label (notes → notes.you.meradomo.com). Not www, portal, or the customer name." },
-          "label": { "type": "string", "description": "Human-readable name shown in the menu-bar app." },
-          "localPort": { "type": "integer", "description": "The local port your app listens on." }
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]{1,63}$",
+            "description": "Subdomain label (notes \u2192 notes.you.meradomo.com). Not www, portal, or the customer name."
+          },
+          "label": {
+            "type": "string",
+            "description": "Human-readable name shown in the menu-bar app."
+          },
+          "localPort": {
+            "type": "integer",
+            "description": "The local port your app listens on."
+          }
         }
       },
       "PublishLive": {
         "type": "object",
         "properties": {
-          "status": { "type": "string", "enum": ["live"] },
-          "host": { "type": "string", "example": "notes.you.meradomo.com" },
-          "url": { "type": "string", "example": "https://notes.you.meradomo.com" }
+          "status": {
+            "type": "string",
+            "enum": [
+              "live"
+            ]
+          },
+          "host": {
+            "type": "string",
+            "example": "notes.you.meradomo.com"
+          },
+          "url": {
+            "type": "string",
+            "example": "https://notes.you.meradomo.com"
+          }
         }
       },
       "PublishPending": {
         "type": "object",
-        "properties": { "status": { "type": "string", "enum": ["pending"] } }
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending"
+            ]
+          }
+        }
       },
       "Status": {
         "type": "object",
         "properties": {
-          "connected": { "type": "boolean" },
-          "host": { "type": "string" },
-          "name": { "type": "string" },
-          "url": { "type": "string" },
-          "pendingApps": { "type": "integer" },
-          "apps": { "type": "array", "items": { "type": "object" } }
+          "connected": {
+            "type": "boolean"
+          },
+          "host": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "pendingApps": {
+            "type": "integer"
+          },
+          "apps": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
         }
       },
       "TokenRequest": {
         "type": "object",
         "properties": {
-          "grant_type": { "type": "string", "enum": ["authorization_code", "refresh_token"] },
-          "code": { "type": "string" },
-          "redirect_uri": { "type": "string" },
-          "client_id": { "type": "string" },
-          "client_secret": { "type": "string", "description": "Confidential clients only." },
-          "code_verifier": { "type": "string" },
-          "refresh_token": { "type": "string" }
+          "grant_type": {
+            "type": "string",
+            "enum": [
+              "authorization_code",
+              "refresh_token"
+            ]
+          },
+          "code": {
+            "type": "string"
+          },
+          "redirect_uri": {
+            "type": "string"
+          },
+          "client_id": {
+            "type": "string"
+          },
+          "client_secret": {
+            "type": "string",
+            "description": "Confidential clients only."
+          },
+          "code_verifier": {
+            "type": "string"
+          },
+          "refresh_token": {
+            "type": "string"
+          }
         }
       },
       "TokenResponse": {
         "type": "object",
         "properties": {
-          "access_token": { "type": "string" },
-          "token_type": { "type": "string", "enum": ["Bearer"] },
-          "expires_in": { "type": "integer", "example": 600 },
-          "refresh_token": { "type": "string" },
-          "scope": { "type": "string", "example": "connect" },
-          "address": { "type": "string", "example": "https://you.meradomo.com" },
-          "host": { "type": "string", "example": "you.meradomo.com" }
+          "access_token": {
+            "type": "string"
+          },
+          "token_type": {
+            "type": "string",
+            "enum": [
+              "Bearer"
+            ]
+          },
+          "expires_in": {
+            "type": "integer",
+            "example": 600
+          },
+          "refresh_token": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "example": "connect"
+          },
+          "address": {
+            "type": "string",
+            "example": "https://you.meradomo.com"
+          },
+          "host": {
+            "type": "string",
+            "example": "you.meradomo.com"
+          }
         }
       },
       "OAuthError": {
         "type": "object",
-        "properties": { "error": { "type": "string", "example": "invalid_grant" } }
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "invalid_grant"
+          }
+        }
       }
     }
   }

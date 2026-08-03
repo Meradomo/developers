@@ -30,6 +30,7 @@
             "pages": [
               "guides/agent-api",
               "guides/embedded-engine",
+              "guides/sharing",
               "guides/oauth",
               "guides/security-model",
               "guides/threat-model",

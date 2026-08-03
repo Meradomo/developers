@@ -3,13 +3,19 @@ title: "API reference"
 description: "The two HTTP surfaces that make up the Meradomo integration API."
 ---
 
-Meradomo has no SDK — these HTTP endpoints **are** the API. There are two surfaces:
+These HTTP endpoints are the API, and any language can drive them. Rust hosts can use the
+[`meradomo-engine`](https://crates.io/crates/meradomo-engine) crate instead
+([docs](https://docs.rs/meradomo-engine)), which wraps the local surface below.
+
+There are two surfaces:
 
 <CardGroup cols={2}>
-  <Card title="Publish API" icon="rss">
-    On `http://127.0.0.1:8765` — the local management API your on-device app calls to publish itself
-    and read status. Localhost-only; any local process may call the open tier. See
-    [Agent API](/guides/agent-api).
+  <Card title="Local engine API" icon="rss">
+    On `http://127.0.0.1:8765` — what your on-device app calls to publish itself, read status,
+    attach to the shared engine, and manage who else can reach it. Localhost-only. The publish
+    and engine tiers are open; the People tier needs a capability. See
+    [Agent API](/guides/agent-api), [Embed the engine](/guides/embedded-engine) and
+    [Sharing](/guides/sharing).
   </Card>
   <Card title="Connect API (OAuth)" icon="key">
     On `https://account.meradomo.com` — the OAuth 2.0 + PKCE endpoints your remote client uses to
