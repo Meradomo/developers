@@ -3,8 +3,8 @@ title: "Custom domains"
 description: "Serve a user's computer at a hostname they own, without Meradomo ever touching their DNS."
 ---
 
-A Meradomo address looks like `kamran.meradomo.com`. A custom domain lets the same computer
-answer at a hostname the user owns — `files.kamran.com` — with the same apps, the same identity
+A Meradomo address looks like `example.meradomo.com`. A custom domain lets the same computer
+answer at a hostname the user owns — `files.example.com` — with the same apps, the same identity
 headers, and the same guarantees.
 
 Nothing about your app changes. This page explains the mechanism, because the design choice at
@@ -26,8 +26,8 @@ That is enforced rather than promised: the DNS driver refuses to write any recor
 
 | Type | Name | Points to |
 | --- | --- | --- |
-| CNAME | `files.kamran.com` | `kamran.meradomo.com` |
-| CNAME | `_acme-challenge.files.kamran.com` | `_acme-challenge.kamran.meradomo.com` |
+| CNAME | `files.example.com` | `example.meradomo.com` |
+| CNAME | `_acme-challenge.files.example.com` | `_acme-challenge.example.meradomo.com` |
 
 **The first is routing.** The user's hostname resolves to our front door, which reads the
 hostname out of the TLS handshake and splices the connection to their computer — still without
@@ -71,8 +71,8 @@ under *our* name, which our driver is already allowed to write.
 
 Nothing, which is the intent.
 
-Your app is reached at `<your-app>.files.kamran.com` exactly as it was at
-`<your-app>.kamran.meradomo.com`. The same verified `X-Meradomo-*` headers arrive, injected by
+Your app is reached at `<your-app>.files.example.com` exactly as it was at
+`<your-app>.example.meradomo.com`. The same verified `X-Meradomo-*` headers arrive, injected by
 the same agent after the same checks (see the [security model](/guides/security-model)). If you
 have hardcoded a `.meradomo.com` suffix anywhere, that is the one thing to revisit — read the
 `Host` header rather than assuming the domain.
