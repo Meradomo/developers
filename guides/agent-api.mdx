@@ -91,15 +91,36 @@ On every proxied request to your app, the agent:
 | `X-Meradomo-Email` | Verified email address |
 | `X-Meradomo-Name` | The customer's short name (e.g. `you`) |
 | `X-Meradomo-App` | Your published app's label |
+| `X-Meradomo-Role` | `owner` or `member` — who you are talking to |
 
 Treat these as the **sole** source of identity — no sign-in logic needed. See
 [Security model](/guides/security-model) for the unspoofability guarantee.
+
+<Warning>
+`X-Meradomo-Role` is the only way to tell the owner from somebody they shared with. Every visitor
+arrives from `127.0.0.1`, because that is what a proxy in front looks like — so deciding it from the
+connection address hands your owner's controls to everybody.
+</Warning>
+
+Key per-person data on `X-Meradomo-User`, not on the email: it is stable, and it lets somebody change
+address without losing what they had.
 
 ## Owner tier (informational — the menu-bar app)
 
 Approving, denying, and revoking apps is the menu-bar app's job (guarded by a secret only it knows).
 Your app never calls these routes; it just handles the `pending` → `live` transition by polling
 `GET /publish/:name`.
+
+## Sharing your app with other people
+
+An app that **bundles the engine** can also invite people to it, so its owner never leaves your app to
+share it. That needs a capability the engine hands out at registration — see
+[Sharing your app with other people](/guides/embedded-engine#sharing-your-app-with-other-people).
+
+An app taking the detect-the-app path (this guide) cannot: it has no engine of its own, and the
+running Meradomo app's credential is not yours to borrow. Your owner shares from the menu bar or the
+account page instead, and your app still receives the resulting visitors with full identity headers as
+above.
 
 ## Local development notes
 

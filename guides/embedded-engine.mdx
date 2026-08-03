@@ -129,6 +129,10 @@ The worked example lives at `engine-launcher/examples/hello_meradomo.rs`.
 | `register` / `heartbeat` / `deregister` | join / refresh / leave the reference-counted lifecycle |
 | `connect(req, …)` | the full cold-start: browser onboarding → engine → publish |
 | `publish` / `unpublish` / `status` | manage this app's public route |
+| `people(base)` | everyone who can reach this computer, and the apps that can be shared |
+| `invite(base, email, apps)` | invite somebody, handing over those apps in the same step |
+| `grant(base, account_id, app, granted)` | give or withdraw one app for one person |
+| `revoke(base, account_id)` | remove somebody |
 | `EngineInfo::needs_renewal()` | true when the subscription lapsed — show a "renew" prompt |
 
 ## Any language: the raw wire protocol
@@ -150,6 +154,96 @@ camelCase, no auth (loopback + same-user is the trust boundary — see
 
 Attach to an incumbent engine only when its `protocol` matches yours; a different number means
 "incompatible — start your own".
+
+Those routes are open because loopback and the same user account are already the trust boundary. The
+ones in the next section are not: they change who can reach the computer, so they are guarded.
+
+## Sharing your app with other people
+
+Your users can hand access to somebody else — a partner, a bandmate, a client — without leaving your
+app, without a browser, and without installing anything of ours. You call four endpoints; Meradomo
+sends the invitation, signs the person in, and enforces the access.
+
+<Note>
+An invitation hands over **the apps you name and nothing else**. Somebody invited to your app cannot
+reach anything else on that computer, and cannot invite anybody themselves. Only the owner can.
+</Note>
+
+### Getting the key
+
+These routes need a capability, because they change who can reach somebody's computer. Registering is
+what earns it: `POST /engine/register` replies with `capability`, and every call below sends it as
+`x-engine-capability`.
+
+```
+POST /engine/register   {"appId": "com.example.myapp", "pid": 4213}
+→ {"ok": true, "protocol": 1, "registrants": 1, "capability": "8f2c…"}
+```
+
+It is minted per engine **run** and held only in memory, so one from a previous run is worthless.
+Register again after an engine restarts — it is idempotent, so calling it before each request is fine
+and is what the Rust crate does.
+
+This is also why an app that *attached* to an engine somebody else started can still manage people:
+the key comes from registering, not from having spawned the engine.
+
+### The routes
+
+| Method & path | Body | Purpose |
+|---|---|---|
+| `GET /people` | — | `{name, members: [{email, accountId, role, status, apps}], publishedApps}` |
+| `POST /people/invite` | `{email, apps?}` | invite by email, handing over `apps` in the same step |
+| `POST /people/grant` | `{accountId, app, granted}` | give or withdraw one app |
+| `POST /people/revoke` | `{accountId}` | remove somebody |
+
+`role` is `owner` or `member`. `status` is `active` (accepted), `pending` (invited, not yet accepted)
+or `revoked` (removed — keep these out of your own list). `apps` are the labels that person may open,
+and `publishedApps` is what you may name in an invitation.
+
+### What the person receives
+
+An email saying **"Kamran shared Music with you"**, pointing at your app's own address — not a generic
+front page. Accepting signs them in and drops them straight into your app, and the access is already
+there, so nothing refuses them on arrival.
+
+If the owner has a verified [custom domain](/guides/custom-domain), the invitation names that instead.
+
+### Telling your owner apart from your visitors
+
+Every forwarded request carries the visitor's verified identity, so your app can offer the owner
+controls that a visitor must not see:
+
+```
+X-Meradomo-User    stable account id — key per-person data on this, not on the address
+X-Meradomo-Email   their address
+X-Meradomo-Role    owner | member
+X-Meradomo-App     the app label
+```
+
+<Warning>
+Do not decide this from the connection address. The engine proxies to `127.0.0.1`, so **every** visitor
+arrives from loopback — a phone on the other side of the world included. Trusting loopback here hands
+your owner's controls to everybody. Use `X-Meradomo-Role`.
+
+Any copy of these headers the visitor sent is stripped before the real ones are written, which is what
+makes them trustworthy. See the [security model](/guides/security-model).
+</Warning>
+
+Keying per-person data on `X-Meradomo-User` rather than the email is what lets somebody change address
+without losing everything they had.
+
+### Refusals are written to be read
+
+Meradomo decides what counts as an address, which apps may be granted, and how often invitations may be
+sent — the same rate limit that guards sign-in links. When it refuses, the message comes back in words
+meant for a person:
+
+```json
+{"error": "that does not look like an email address"}
+{"error": "you have not shared an app called Photos"}
+```
+
+Show them. Replacing them with wording of your own loses the part that says what to do next.
 
 ## Billing (Model A)
 
