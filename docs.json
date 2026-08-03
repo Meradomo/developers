@@ -82,7 +82,7 @@
   },
   "background": {
     "color": {
-      "light": "#FAF9F7",
+      "light": "#F5F5F7",
       "dark": "#0a0a0c"
     }
   },
@@ -90,7 +90,7 @@
     "family": "Inter"
   },
   "appearance": {
-    "default": "dark"
+    "default": "light"
   },
   "styling": {
     "eyebrows": "breadcrumbs"
